@@ -1,3 +1,4 @@
+"""Test compatibility shim. Not used in the production execution path."""
 from pathlib import Path
 import json
 
