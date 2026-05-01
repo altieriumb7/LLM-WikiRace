@@ -41,7 +41,7 @@ def parse_yaml(path):
     return data
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--difficulty',default='easy'); ap.add_argument('--limit',type=int,default=1); ap.add_argument('--mode-configs',nargs='*'); ap.add_argument('--output-dir',default='outputs/phase2_ablations'); ap.add_argument('--mock',action='store_true'); ap.add_argument('--dry-run',action='store_true')
+    ap=argparse.ArgumentParser(); ap.add_argument('--difficulty',default='easy'); ap.add_argument('--limit','--games',dest='limit',type=int,default=1); ap.add_argument('--mode-configs','--mode',dest='mode_configs',nargs='*'); ap.add_argument('--output-dir','--output',dest='output_dir',default='outputs/phase2_ablations'); ap.add_argument('--mock',action='store_true'); ap.add_argument('--dry-run',action='store_true')
     args=ap.parse_args(); paths=[Path(p) for p in (args.mode_configs or default_mode_paths())]
     modes=[load_mode(p) for p in paths]
     if args.dry_run:
@@ -57,8 +57,14 @@ def main():
         rows=[]
         for inst in instances:
             r=run_game(inst['start_page'],inst['target_page'],strategy,adapter,budget=m.budget)
-            rows.append({'mode':m.strategy,'instance_id':inst['instance_id'],**r.to_dict()})
+            row={'mode':m.strategy,'instance_id':inst['instance_id'],**r}
+            row.pop('state', None)
+            rows.append(row)
         (mdir/'results.jsonl').write_text('\n'.join(json.dumps(r) for r in rows)+'\n')
-        summary[m.strategy]={'num_instances':len(rows),'successes':sum(1 for r in rows if r['success'])}
+        summary[m.strategy]={'num_instances':len(rows),'successes':sum(1 for r in rows if r['status']=="success")}
     (out/'summary.json').write_text(json.dumps(summary,indent=2))
 
+
+
+if __name__ == '__main__':
+    main()

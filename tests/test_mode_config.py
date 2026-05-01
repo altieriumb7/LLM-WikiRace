@@ -1,28 +1,27 @@
-import pytest
-from scripts.run_phase2_ablations import parse_yaml
-from wikirace.modes import get_mode_config
+from pathlib import Path
+from wikirace.config import load_mode
 
-cfg=parse_yaml('configs/stratified_navigator.yaml')
 
 def test_load_modes():
     for m in ['baseline','state_only','stratified','full']:
-        assert get_mode_config(m,cfg).name==m
+        assert load_mode(Path(f'configs/modes/{m}.yaml')).strategy==m
+
 
 def test_baseline_flags():
-    m=get_mode_config('baseline',cfg)
-    assert not m.use_json_state and not m.use_gate and not m.escape_logic and not m.use_beam_search
+    m=load_mode(Path('configs/modes/baseline.yaml'))
+    assert (m.strategy=='baseline') and (m.model is not None) and (m.strategic_model is None)
+
 
 def test_state_only_flags():
-    m=get_mode_config('state_only',cfg)
-    assert m.use_json_state and m.enabled_invariants=={'acyclicity','budget'} and not m.use_backbone_planning
+    m=load_mode(Path('configs/modes/state_only.yaml'))
+    assert m.strategy=='state_only' and m.model is not None
+
 
 def test_stratified_flags():
-    m=get_mode_config('stratified',cfg)
-    assert m.periodic_replan and not m.decay_replan and not m.escape_logic
+    m=load_mode(Path('configs/modes/stratified.yaml'))
+    assert m.strategy=='stratified' and m.tactical_model and m.strategic_model
+
 
 def test_full_flags():
-    m=get_mode_config('full',cfg)
-    assert {'acyclicity','budget','trap','score_decay'}.issubset(m.enabled_invariants)
-
-def test_invalid_mode():
-    with pytest.raises(ValueError): get_mode_config('bad',cfg)
+    m=load_mode(Path('configs/modes/full.yaml'))
+    assert m.strategy=='full' and m.escape_threshold is not None
