@@ -1,3 +1,12 @@
+from dataclasses import dataclass, asdict
+from typing import Optional, Tuple
+
+@dataclass
+class Result:
+    success: bool
+    steps_used: int
+    path: Tuple[str, ...]
+    failure_reason: Optional[str] = None
 from dataclasses import asdict, dataclass
 from statistics import median
 from typing import Dict, List, Optional
@@ -23,6 +32,10 @@ class AblationResult:
     fallback_used: int = 0
     api_errors: int = 0
 
+    def to_dict(self):
+        d = asdict(self)
+        d['path'] = list(self.path)
+        return d
 
 def summarize_mode(results: List[AblationResult]) -> Dict:
     succ = [r for r in results if r.success]
