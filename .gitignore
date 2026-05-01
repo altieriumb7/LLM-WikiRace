@@ -5,3 +5,9 @@ logs/
 *.tmp
 __pycache__/
 .pytest_cache/
+data/oracle/*.sqlite
+data/oracle/*.sqlite3
+data/oracle/*.db
+data/oracle.db
+*.sqlite
+*.sqlite3
