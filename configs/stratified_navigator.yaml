@@ -1,80 +1,12 @@
 budget: 30
-top_k: 5
 beam_width: 5
-periodic_replan_min_steps: 5
-periodic_replan_divisor: 6
+top_k: 5
+tactical_model: "gpt-4o-mini"
+strategic_model: "gpt-4o"
+periodic_replan_steps: 6
 score_decay_window: 3
 trap_outdegree_threshold: 10
 trap_target_score_threshold: 5
-escape_resolved_outdegree_threshold: 20
+hub_rejection_threshold: 3
 temperature: 0
-max_json_repair_retries: 1
-max_api_retries: 5
-api_backoff_initial_seconds: 1
-api_backoff_max_seconds: 30
-
-modes:
-  baseline:
-    tactical_model: "gpt-4o"
-    strategic_model: null
-    use_json_state: false
-    use_gate: false
-    enabled_invariants: []
-    use_backbone_planning: false
-    periodic_replan: false
-    decay_replan: false
-    trap_detection: false
-    escape_logic: false
-    use_beam_search: false
-    beam_width: 1
-    top_k: 5
-    baseline_chat_history: true
-    deterministic_fallback: false
-  state_only:
-    tactical_model: "gpt-4o"
-    strategic_model: null
-    use_json_state: true
-    use_gate: true
-    enabled_invariants: ["acyclicity", "budget"]
-    use_backbone_planning: false
-    periodic_replan: false
-    decay_replan: false
-    trap_detection: false
-    escape_logic: false
-    use_beam_search: false
-    beam_width: 1
-    top_k: 5
-    baseline_chat_history: false
-    deterministic_fallback: true
-  stratified:
-    tactical_model: "gpt-4o-mini"
-    strategic_model: "gpt-4o"
-    use_json_state: true
-    use_gate: true
-    enabled_invariants: ["acyclicity", "budget"]
-    use_backbone_planning: true
-    periodic_replan: true
-    decay_replan: false
-    trap_detection: false
-    escape_logic: false
-    use_beam_search: true
-    beam_width: 5
-    top_k: 5
-    baseline_chat_history: false
-    deterministic_fallback: true
-  full:
-    tactical_model: "gpt-4o-mini"
-    strategic_model: "gpt-4o"
-    use_json_state: true
-    use_gate: true
-    enabled_invariants: ["acyclicity", "budget", "trap", "score_decay"]
-    use_backbone_planning: true
-    periodic_replan: true
-    decay_replan: true
-    trap_detection: true
-    escape_logic: true
-    use_beam_search: true
-    beam_width: 5
-    top_k: 5
-    baseline_chat_history: false
-    deterministic_fallback: true
+max_retries: 3

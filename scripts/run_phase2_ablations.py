@@ -5,9 +5,10 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from wikirace.api_client import FrontierAPIClient
 from wikirace.live_adapter import WikiRaceAdapter, GameInstance, PageMetrics
 from wikirace.modes import get_mode_config
-from wikirace.agent import run_game
-from wikirace.strategies import build_strategy_with_models
+from wikirace.navigator import NavigatorConfig, StratifiedNavigator
 from wikirace.results import AblationResult, summarize_mode
+from wikirace.strategic_model import StrategicModel
+from wikirace.tactical_model import TacticalModel
 
 def parse_value(v):
     v=v.strip()
@@ -57,12 +58,14 @@ def main():
     (out/'instances.jsonl').write_text('\n'.join(json.dumps(i.__dict__) for i in instances)+'\n'); (out/'config_resolved.yaml').write_text(Path(args.config).read_text())
     results_by_mode={}
     for mode_name in args.modes.split(','):
-        get_mode_config(mode_name,cfg); mdir=out/mode_name; mdir.mkdir(exist_ok=True)
-        api=FrontierAPIClient()
-        strategy=build_strategy_with_models(mode_name,cfg,api,adapter,mock=args.mock); rows=[]
+        mode=get_mode_config(mode_name,cfg); mdir=out/mode_name; mdir.mkdir(exist_ok=True)
+        if args.mock: tactical,strategic=MockTactical(),MockStrategic()
+        else:
+            api=FrontierAPIClient(); tactical=TacticalModel(api,mode.tactical_model,top_k=mode.top_k); strategic=StrategicModel(api,mode.strategic_model or mode.tactical_model)
+        nav=StratifiedNavigator(adapter,tactical,strategic,NavigatorConfig(**cfg)); rows=[]
         for inst in instances:
-            res=run_game(inst,adapter,strategy,budget=int(cfg.get("budget",30)),logger=lambda e: None)
-            rows.append(AblationResult(run_id,mode_name,inst.instance_id,inst.difficulty,inst.start_page,inst.target_page,res['status']=='success',res['state'].steps_used,list(res['state'].path),res.get('failure_reason'),res.get('repeated_page_attempts',0),res.get('budget_rejections',0),res.get('schema_violations',0),res.get('trap_detections',0),res.get('strategic_replans',0),res.get('fallback_used',0),res.get('api_errors',0)))
+            res=nav.run_game(inst,lambda e: None,mode)
+            rows.append(AblationResult(run_id,mode_name,inst.instance_id,inst.difficulty,inst.start_page,inst.target_page,res['status']=='success',res['state'].steps_used,list(res['state'].path),res.get('failure_reason'),res.get('repeated',0),res.get('budget_rejections',0),res.get('schema_violations',0),res.get('trap',0),res.get('replans',0),res.get('fallback',0),res.get('api_errors',0)))
         (mdir/'results.jsonl').write_text('\n'.join(json.dumps(r.__dict__) for r in rows)+'\n'); results_by_mode[mode_name]=rows
     summary={m:summarize_mode(r) for m,r in results_by_mode.items()}; summary['is_mock']=args.mock
     (out/'summary.json').write_text(json.dumps(summary,indent=2)); (out/'run_manifest.json').write_text(json.dumps({"run_id":run_id,"modes":args.modes.split(','),"difficulty":args.difficulty,"limit":lim,"is_mock":args.mock},indent=2))

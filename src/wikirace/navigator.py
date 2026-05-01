@@ -1,98 +1,81 @@
+from dataclasses import dataclass
 from typing import Any, Dict, List
-from .fallback import select_fallback
+
+from .beam_search import BeamState, rank_beams
 from .invariant_gate import GateConfig, InvariantGate
-from .modes import ModeConfig
-from .replan import evaluate_replan
-from .state import initialize_state, transition_to, with_backbone, with_phase
+from .trap_detection import TrapConfig, is_local_basin
 
 
+@dataclass
 class NavigatorConfig:
-    def __init__(self, **kwargs):
-        self.budget = int(kwargs.get("budget", 30))
-        self.trap_target_score_threshold = int(kwargs.get("trap_target_score_threshold", 5))
-        self.escape_resolved_outdegree_threshold = int(kwargs.get("escape_resolved_outdegree_threshold", 20))
+    budget: int = 30
+    beam_width: int = 5
+    top_k: int = 5
+    periodic_replan_steps: int = 6
+    score_decay_window: int = 3
+    trap_outdegree_threshold: int = 10
+    trap_target_score_threshold: int = 5
 
 
 class StratifiedNavigator:
-    def __init__(self, adapter, tactical_model, strategic_model, cfg: NavigatorConfig):
-        self.adapter = adapter
+    def __init__(self, graph_adapter, tactical_model, strategic_model, cfg: NavigatorConfig):
+        self.graph = graph_adapter
         self.tactical = tactical_model
         self.strategic = strategic_model
         self.cfg = cfg
+        self.gate = InvariantGate(GateConfig(budget=cfg.budget, score_decay_window=cfg.score_decay_window, trap_target_score_threshold=cfg.trap_target_score_threshold))
 
-    def run_game(self, instance, logger, mode: ModeConfig) -> Dict[str, Any]:
-        state = initialize_state(instance.start_page, instance.target_page, self.cfg.budget)
-        chat_history=[]
-        counters={"repeated":0,"budget_rejections":0,"schema_violations":0,"trap":0,"replans":0,"fallback":0,"api_errors":0}
-        gate = InvariantGate(GateConfig(budget=self.cfg.budget))
-        while state.steps_used < state.budget:
-            if self.adapter.is_target(state.current_page, state.target_page):
-                return {"status":"success","state":state,**counters}
-            try:
-                links=self.adapter.get_outgoing_links(state.current_page)
-                metrics=self.adapter.get_link_metrics(links)
-            except Exception:
-                counters["api_errors"]+=1
-                return {"status":"failed","failure_reason":"api_error","state":state,**counters}
-
-            if mode.baseline_chat_history:
-                prompt={"current_page":state.current_page,"target_page":state.target_page,"steps_used":state.steps_used,"outgoing_links":links,"chat_history":chat_history}
-                ranked=self.tactical.rank(prompt)
-                if not ranked.get("candidates"):
-                    counters["schema_violations"]+=1
-                    return {"status":"failed","failure_reason":"invalid_model_move","state":state,**counters}
-                nxt=ranked["candidates"][0]["page"]
-                if nxt not in links:
-                    return {"status":"failed","failure_reason":"invalid_model_move","state":state,**counters}
-                if nxt in state.visited: counters["repeated"]+=1
-                state=transition_to(state,nxt,float(ranked["candidates"][0].get("target_proximity",0)))
-                chat_history.append({"from":state.path[-2],"to":nxt})
-                continue
-
-            ranked_resp=self.tactical.rank({"current_page":state.current_page,"target_page":state.target_page,"steps_used":state.steps_used,"budget":state.budget,"visited":list(state.visited),"phase":state.phase,"outgoing_links":links,"last_scores":list(state.last_scores),"strategic_backbone":list(state.backbone_plan or ()),"current_milestone":state.current_milestone})
-            ranked=ranked_resp.get("candidates",[])
-            if ranked_resp.get("failure_reason"): counters["schema_violations"]+=1
-
-            if mode.trap_detection or mode.decay_replan or mode.periodic_replan:
-                decision=evaluate_replan(state.steps_used,state.budget,list(state.last_scores),len(links),ranked,self.cfg.trap_target_score_threshold)
-                if mode.trap_detection and decision.should_escape and mode.escape_logic:
-                    counters["trap"]+=1; logger({"event_type":"trap_detected"}); state=with_phase(state,"escape");
-                if mode.use_backbone_planning and mode.periodic_replan and decision.reason=="periodic" and mode.strategic_model:
-                    plan=self.strategic.plan({"current_page":state.current_page,"target_page":state.target_page,"steps_used":state.steps_used,"budget":state.budget,"visited":list(state.visited),"outgoing_links":links})
-                    counters["replans"]+=1; state=with_backbone(state,plan.get("backbone",[]),plan.get("current_milestone",""))
-                if mode.use_backbone_planning and mode.decay_replan and decision.reason=="decay" and mode.strategic_model:
-                    plan=self.strategic.plan({"current_page":state.current_page,"target_page":state.target_page,"steps_used":state.steps_used,"budget":state.budget,"visited":list(state.visited),"outgoing_links":links})
-                    counters["replans"]+=1; state=with_backbone(state,plan.get("backbone",[]),plan.get("current_milestone",""))
-
-            if state.phase=="escape" and mode.escape_logic:
-                fb=select_fallback(state.current_page,links,set(state.visited),{k:v.__dict__ for k,v in metrics.items()})
-                if fb.terminal: return {"status":"failed","failure_reason":"loop_exhausted","state":state,**counters}
-                counters["fallback"]+=1
-                state=transition_to(state,fb.selected_page,0.0,phase="progress")
-                logger({"event_type":"escape_move"})
-                continue
-
-            choice=None
-            if mode.use_gate:
-                # basic invariants by config
-                filtered=[]
-                for c in ranked[:mode.top_k]:
-                    ok=True
-                    if "acyclicity" in mode.enabled_invariants and c["page"] in state.visited: counters["repeated"]+=1; ok=False
-                    if "budget" in mode.enabled_invariants and state.steps_used+1+int(c.get("estimated_dist",30))>state.budget: counters["budget_rejections"]+=1; ok=False
-                    if ok: filtered.append(c)
-                if filtered: choice=filtered[0]
-            else:
-                choice=ranked[0] if ranked else None
-
-            if not choice:
-                if mode.deterministic_fallback:
-                    fb=select_fallback(state.current_page,links,set(state.visited),{k:v.__dict__ for k,v in metrics.items()})
-                    if fb.terminal: return {"status":"failed","failure_reason":"loop_exhausted","state":state,**counters}
-                    counters["fallback"]+=1
-                    choice={"page":fb.selected_page,"target_proximity":0}
-                else:
-                    return {"status":"failed","failure_reason":"invalid_model_move","state":state,**counters}
-            state=transition_to(state,choice["page"],float(choice.get("target_proximity",0)))
-
-        return {"status":"failed","failure_reason":"budget_exhausted","state":state,**counters}
+    def run(self, start_page: str, target_page: str, mode: str = "full_stratified") -> Dict[str, Any]:
+        beams = [BeamState(current_page=start_page, path=[start_page], visited={start_page}, steps_used=0)]
+        metrics = {"trap_detections": 0, "strategic_replans": 0, "budget_rejections": 0, "repeated_page_attempts": 0, "api_calls": 0}
+        while beams:
+            new_beams = []
+            for beam in beams:
+                if beam.current_page == target_page:
+                    beam.status = "success"
+                    return {"success": True, "path": beam.path, "steps": beam.steps_used, "metrics": metrics}
+                if beam.steps_used >= self.cfg.budget:
+                    continue
+                links = self.graph.get_outgoing_links(beam.current_page)
+                state = {
+                    "current_page": beam.current_page,
+                    "target_page": target_page,
+                    "steps_used": beam.steps_used,
+                    "budget": self.cfg.budget,
+                    "visited": list(beam.visited),
+                    "phase": "progress",
+                    "outgoing_links": links,
+                    "strategic_backbone": beam.strategic_backbone,
+                    "current_milestone": beam.current_milestone,
+                }
+                ranked = self.tactical.rank(state).get("candidates", [])
+                basin = is_local_basin(len(links), ranked, TrapConfig(self.cfg.trap_outdegree_threshold, self.cfg.trap_target_score_threshold))
+                if basin:
+                    metrics["trap_detections"] += 1
+                choice, stats = self.gate.choose_candidate(ranked, beam.visited, beam.steps_used)
+                metrics["budget_rejections"] += stats.get("budget_rejections", 0)
+                metrics["repeated_page_attempts"] += stats.get("cycle_rejections", 0)
+                if not choice or mode == "baseline_chat":
+                    continue
+                candidates = [choice] if self.cfg.beam_width == 1 else ranked[: self.cfg.beam_width]
+                for c in candidates:
+                    if c["page"] in beam.visited:
+                        continue
+                    nb = BeamState(
+                        current_page=c["page"],
+                        path=beam.path + [c["page"]],
+                        visited=set(beam.visited) | {c["page"]},
+                        steps_used=beam.steps_used + 1,
+                        score_history=beam.score_history + [c.get("combined_score", c.get("target_proximity", 0))],
+                        strategic_backbone=beam.strategic_backbone,
+                        current_milestone=beam.current_milestone,
+                    )
+                    if self.gate.decay_trigger(nb.score_history, self.cfg.score_decay_window) or nb.steps_used % self.cfg.periodic_replan_steps == 0:
+                        if mode in ("tactical_strategic", "full_stratified"):
+                            plan = self.strategic.plan({"current_page": nb.current_page, "target_page": target_page, "visited": list(nb.visited), "steps_used": nb.steps_used, "budget": self.cfg.budget, "outgoing_links": self.graph.get_outgoing_links(nb.current_page), "recent_trail": nb.path[-5:], "failed_candidates": [], "previous_backbone": nb.strategic_backbone})
+                            nb.strategic_backbone = plan.get("backbone", nb.strategic_backbone)
+                            nb.current_milestone = plan.get("current_milestone", nb.current_milestone)
+                            metrics["strategic_replans"] += 1
+                    new_beams.append(nb)
+            beams = rank_beams(new_beams)[: self.cfg.beam_width]
+        return {"success": False, "path": [], "steps": self.cfg.budget, "metrics": metrics, "failure_reason": "no_legal_beams"}
