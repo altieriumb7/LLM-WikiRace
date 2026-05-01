@@ -17,6 +17,10 @@ class NavigatorState:
     last_scores: Tuple[float, ...] = field(default_factory=tuple)
     last_replan_step: Optional[int] = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    replan_count: int = 0
+    escape_count: int = 0
+    trap_count: int = 0
+    fallback_count: int = 0
 
     def __post_init__(self):
         if self.steps_used < 0 or self.steps_used > self.budget: raise ValueError("steps_used must be between 0 and budget")
@@ -28,7 +32,7 @@ def initialize_state(start_page: str, target_page: str, budget: int = 30) -> Nav
     return NavigatorState(start_page, target_page, 0, budget, frozenset({start_page}), (start_page,))
 
 def transition_to(state: NavigatorState, next_page: str, score: float, phase=None, backbone_plan=None, current_milestone=None) -> NavigatorState:
-    return NavigatorState(next_page, state.target_page, state.steps_used + 1, state.budget, frozenset(set(state.visited)|{next_page}), tuple(list(state.path)+[next_page]), phase or state.phase, tuple(backbone_plan) if backbone_plan is not None else state.backbone_plan, current_milestone if current_milestone is not None else state.current_milestone, tuple((list(state.last_scores)+[float(score)])[-3:]), state.last_replan_step, dict(state.metadata))
+    return NavigatorState(next_page, state.target_page, state.steps_used + 1, state.budget, frozenset(set(state.visited)|{next_page}), tuple(list(state.path)+[next_page]), phase or state.phase, tuple(backbone_plan) if backbone_plan is not None else state.backbone_plan, current_milestone if current_milestone is not None else state.current_milestone, tuple((list(state.last_scores)+[float(score)])[-3:]), state.last_replan_step, dict(state.metadata), state.replan_count, state.escape_count, state.trap_count, state.fallback_count)
 
 def with_phase(state: NavigatorState, phase: Literal["progress", "replan", "escape"]) -> NavigatorState:
     return NavigatorState(**{**state.__dict__,"phase":phase})
