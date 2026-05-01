@@ -11,3 +11,11 @@ def test_invalid_configs():
     with pytest.raises(ConfigValidationError): ModeConfig(strategy='state_only',model='x',beam_width=0)
     with pytest.raises(ConfigValidationError): ModeConfig(strategy='state_only',model='x',top_k=0)
     with pytest.raises(ConfigValidationError): ModeConfig(strategy='state_only',model='x',budget=999)
+
+
+def test_oracle_config_rules(tmp_path):
+    db=str(tmp_path/'x.sqlite')
+    with pytest.raises(ConfigValidationError): ModeConfig(strategy='baseline',model='x',oracle_db_path=db)
+    ModeConfig(strategy='full',tactical_model='x',strategic_model='y',escape_threshold=10,deterministic_fallback=True,oracle_db_path=db)
+    ModeConfig(strategy='full',tactical_model='x',strategic_model='y',escape_threshold=10,deterministic_fallback=True)
+    ModeConfig(strategy='baseline',model='x')

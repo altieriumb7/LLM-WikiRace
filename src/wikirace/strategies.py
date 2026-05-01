@@ -4,6 +4,7 @@ from typing import Protocol
 from .config import ModeConfig
 from .fallback import select_fallback
 from .replan import evaluate_replan
+from .oracle import DistanceOracle
 
 
 class NavigationStrategy(Protocol):
@@ -86,6 +87,19 @@ class StratifiedStrategy(StatefulStrategy):
 @dataclass
 class FullStrategy(StratifiedStrategy):
     escape_threshold: int = 10
+    oracle: DistanceOracle | None = None
+
+    def select_move(self, state, candidates):
+        if self.oracle is not None and candidates:
+            distances = self.oracle.batch_distance(list(candidates), state.target_page)
+            known = sorted([(c, d) for c, d in distances.items() if d is not None], key=lambda x: x[1])
+            for candidate, _dist in known:
+                if candidate in state.visited:
+                    continue
+                if state.steps_used + 1 > state.budget:
+                    continue
+                return candidate, {}
+        return super().select_move(state, candidates)
 
     def should_replan(self, state):
         d = evaluate_replan(state.steps_used, state.budget, [3, 2, 1], 5, [{"target_proximity": 1}], 5)
@@ -118,5 +132,6 @@ def build_strategy(config: ModeConfig, adapter) -> NavigationStrategy:
     if config.strategy == "stratified":
         return StratifiedStrategy(model=_Ranker(), adapter=adapter, top_k=config.top_k, deterministic_fallback=config.deterministic_fallback, strategic_model=_Planner(), replan_interval=config.replan_interval, decay_replan=config.decay_replan)
     if config.strategy == "full":
-        return FullStrategy(model=_Ranker(), adapter=adapter, top_k=config.top_k, deterministic_fallback=config.deterministic_fallback, strategic_model=_Planner(), replan_interval=config.replan_interval, decay_replan=config.decay_replan, escape_threshold=config.escape_threshold or 10)
+        oracle = DistanceOracle(config.oracle_db_path) if config.oracle_db_path else None
+        return FullStrategy(model=_Ranker(), adapter=adapter, top_k=config.top_k, deterministic_fallback=config.deterministic_fallback, strategic_model=_Planner(), replan_interval=config.replan_interval, decay_replan=config.decay_replan, escape_threshold=config.escape_threshold or 10, oracle=oracle)
     raise ValueError(config.strategy)

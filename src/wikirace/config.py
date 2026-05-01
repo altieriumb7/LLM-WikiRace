@@ -18,6 +18,7 @@ class ModeConfig:
     decay_replan: bool=False
     escape_threshold: Optional[int]=None
     deterministic_fallback: bool=False
+    oracle_db_path: Optional[str]=None
 
     def __post_init__(self):
         s=self.strategy
@@ -29,6 +30,7 @@ class ModeConfig:
         if s=='baseline':
             if self.escape_threshold is not None: raise ConfigValidationError('baseline must not set escape_threshold')
             if self.deterministic_fallback: raise ConfigValidationError('baseline must not enable deterministic_fallback')
+            if self.oracle_db_path is not None: raise ConfigValidationError('baseline must not set oracle_db_path')
         if s!='full' and self.escape_threshold is not None: raise ConfigValidationError('escape_threshold is only valid for full strategy')
         if not (1 <= self.budget <= 30): raise ConfigValidationError('budget must be in 1..30')
         if self.top_k < 1: raise ConfigValidationError('top_k must be >= 1')
