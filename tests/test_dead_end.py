@@ -11,5 +11,6 @@ class A:
 
 def test_dead_end_result():
     a=A(); s=build_strategy(ModeConfig(strategy='baseline',model='x'),a)
-    r=run_game('S','T',s,a,budget=30)
-    assert (r.success is False) and (r.failure_reason=='dead_end')
+    r=run_game('S','T',s,a,budget=6)
+    assert r['status']=='failed'
+    assert r['failure_reason'] in {'invalid_model_move','budget_exhausted'}

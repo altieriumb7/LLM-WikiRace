@@ -57,8 +57,10 @@ def main():
         rows=[]
         for inst in instances:
             r=run_game(inst['start_page'],inst['target_page'],strategy,adapter,budget=m.budget)
-            rows.append({'mode':m.strategy,'instance_id':inst['instance_id'],**r.to_dict()})
+            row={'mode':m.strategy,'instance_id':inst['instance_id'],**r}
+            row.pop('state', None)
+            rows.append(row)
         (mdir/'results.jsonl').write_text('\n'.join(json.dumps(r) for r in rows)+'\n')
-        summary[m.strategy]={'num_instances':len(rows),'successes':sum(1 for r in rows if r['success'])}
+        summary[m.strategy]={'num_instances':len(rows),'successes':sum(1 for r in rows if r['status']=="success")}
     (out/'summary.json').write_text(json.dumps(summary,indent=2))
 
