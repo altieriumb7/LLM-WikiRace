@@ -1,0 +1,11 @@
+strategy: state_only
+model: gpt-4o
+tactical_model: null
+strategic_model: null
+budget: 30
+top_k: 5
+beam_width: 1
+replan_interval: 5
+decay_replan: false
+escape_threshold: null
+deterministic_fallback: true

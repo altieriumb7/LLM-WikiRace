@@ -1,0 +1,11 @@
+strategy: full
+model: null
+tactical_model: gpt-4o-mini
+strategic_model: gpt-4o
+budget: 30
+top_k: 5
+beam_width: 5
+replan_interval: 5
+decay_replan: true
+escape_threshold: 10
+deterministic_fallback: true
