@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys,argparse,json,uuid
+import sys,argparse,json,uuid,os
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from wikirace.agent import run_game
@@ -46,9 +46,39 @@ def main():
     modes=[load_mode(p) for p in paths]
     if args.dry_run:
         print('validated', [m.strategy for m in modes]); return
-    run_id=str(uuid.uuid4()); out=Path(args.output_dir)/run_id; out.mkdir(parents=True,exist_ok=True)
-    adapter=MockAdapter() if args.mock else WikiRaceAdapter()
+    use_mock = args.mock or os.getenv('WIKIRACE_MOCK') == '1'
+    adapter=MockAdapter() if use_mock else WikiRaceAdapter()
     instances=adapter.get_instances(args.difficulty,args.limit)
+
+    # Flat JSONL mode when output points to a file path.
+    if str(args.output_dir).endswith('.jsonl') and len(modes) == 1:
+        out_file = Path(args.output_dir)
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        strategy=build_strategy(modes[0],adapter)
+        rows=[]
+        for inst in instances:
+            r=run_game(inst['start_page'],inst['target_page'],strategy,adapter,budget=modes[0].budget)
+            st=r.get('state')
+            rows.append({
+                'start': inst['start_page'],
+                'target': inst['target_page'],
+                'steps_used': getattr(st, 'steps_used', None),
+                'status': r.get('status'),
+                'path': list(getattr(st, 'path', [])),
+                'failure_reason': r.get('failure_reason'),
+                'final_page': getattr(st, 'current_page', None),
+                'repeated_page_attempts': r.get('repeated_page_attempts', 0),
+                'budget_rejections': r.get('budget_rejections', 0),
+                'schema_violations': r.get('schema_violations', 0),
+                'trap_detections': r.get('trap_detections', 0),
+                'strategic_replans': r.get('strategic_replans', 0),
+                'fallback_used': r.get('fallback_used', 0),
+                'api_errors': r.get('api_errors', 0),
+            })
+        out_file.write_text('\n'.join(json.dumps(x) for x in rows)+'\n')
+        return
+
+    run_id=str(uuid.uuid4()); out=Path(args.output_dir)/run_id; out.mkdir(parents=True,exist_ok=True)
     (out/'instances.jsonl').write_text('\n'.join(json.dumps(i) for i in instances)+'\n')
     summary={}
     for m in modes:
