@@ -1,4 +1,3 @@
-<<<<<<< codex/implement-stratified-navigator-for-llm-wikirace
 import json, re
 from typing import Any, Dict
 from .api_client import FrontierAPIClient
@@ -25,7 +24,6 @@ class TacticalModel:
             rep=self.api.complete_json(self.model,SYSTEM_PROMPT,{"invalid_response":r.text,"repair":True},temperature=0)
             try:return {"candidates":self._parse(rep.text)['candidates'],"failure_reason":None}
             except Exception:return {"candidates":[],"failure_reason":"schema_repair_failed","event_type":"schema_repair_failed"}
-=======
 import json
 import re
 from typing import Any, Dict, List
@@ -61,4 +59,3 @@ class TacticalModel:
             repaired = self.api.complete_json(self.model, SYSTEM_PROMPT, repair_payload, temperature=0)
             data = self._parse(repaired.text)
         return data
->>>>>>> main
