@@ -78,3 +78,14 @@ modes:
     top_k: 5
     baseline_chat_history: false
     deterministic_fallback: true
+beam_width: 5
+top_k: 5
+tactical_model: "gpt-4o-mini"
+strategic_model: "gpt-4o"
+periodic_replan_steps: 6
+score_decay_window: 3
+trap_outdegree_threshold: 10
+trap_target_score_threshold: 5
+hub_rejection_threshold: 3
+temperature: 0
+max_retries: 3
