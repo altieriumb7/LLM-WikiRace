@@ -73,6 +73,10 @@ def main():
                 'trap_detections': r.get('trap_detections', 0),
                 'strategic_replans': r.get('strategic_replans', 0),
                 'fallback_used': r.get('fallback_used', 0),
+                'replan_count': int(r.get('replan_count', 0)),
+                'escape_count': int(r.get('escape_count', 0)),
+                'trap_count': int(r.get('trap_count', r.get('trap_detections', 0))),
+                'fallback_used_count': int(r.get('fallback_used_count', r.get('fallback_used', 0))),
                 'api_errors': r.get('api_errors', 0),
             })
         out_file.write_text('\n'.join(json.dumps(x) for x in rows)+'\n')
