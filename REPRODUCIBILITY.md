@@ -1,0 +1,31 @@
+# Reproducibility Checklist
+
+- Python version: 3.12
+- Install: `pip install -r requirements.txt`
+- Tests: `python -m pytest tests -q`
+- Compile check: `python -m compileall -q src scripts tests app.py`
+- Streamlit: `streamlit run app.py --server.headless true --server.port 8501`
+- Docker build: `docker build -t llm-redteam-hf .`
+- Docker run: `docker run --rm -p 8501:8501 -e DEMO_MODE=true -e ALLOW_LIVE_RUNS=false llm-redteam-hf`
+- Demo benchmark: `python -m src.generate_demo_benchmark --output reports/demo_benchmark`
+- Expected files:
+  - `reports/demo_benchmark/demo_results.json`
+  - `reports/demo_benchmark/demo_summary.csv`
+  - `reports/demo_benchmark/qualitative_case_gallery.md`
+- Hugging Face Space:
+  - SDK: Docker
+  - Port: 8501
+  - Variables: `DEMO_MODE=true`, `ALLOW_LIVE_RUNS=false`, `DEFAULT_CONFIG_PATH=evals/config.yaml`, `REPORTS_DIR=reports`, `BENCHMARK_MODE=demo`
+  - Optional secret: `OPENAI_API_KEY`
+- Environment variables:
+  - `DEMO_MODE`
+  - `ALLOW_LIVE_RUNS`
+  - `BENCHMARK_MODE`
+  - `DEFAULT_CONFIG_PATH`
+  - `REPORTS_DIR`
+  - `OPENAI_API_KEY`
+  - `WIKIRACE_API_BASE_URL`
+- Known limitations:
+  - Public demo artifacts are deterministic samples, not live model results.
+  - Full live evaluation requires credentials and an external WikiRace API.
+  - Hugging Face free storage is ephemeral for runtime-generated files.

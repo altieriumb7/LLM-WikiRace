@@ -5,7 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "wikirace"
 version = "0.2.0"
-dependencies = ["pyyaml"]
+dependencies = ["pyyaml", "streamlit", "pandas", "requests"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+openai = ["openai"]
+benchmark = ["LLM-wikirace"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]

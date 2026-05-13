@@ -41,7 +41,7 @@ def parse_yaml(path):
     return data
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--difficulty',default='easy'); ap.add_argument('--limit','--games',dest='limit',type=int,default=1); ap.add_argument('--mode-configs','--mode',dest='mode_configs',nargs='*'); ap.add_argument('--output-dir','--output',dest='output_dir',default='outputs/phase2_ablations'); ap.add_argument('--mock',action='store_true'); ap.add_argument('--dry-run',action='store_true')
+    ap=argparse.ArgumentParser(); ap.add_argument('--difficulty',default='easy'); ap.add_argument('--limit','--games',dest='limit',type=int,default=1); ap.add_argument('--mode-configs','--mode',dest='mode_configs',nargs='*'); ap.add_argument('--output-dir','--output',dest='output_dir',default='outputs/phase2_ablations'); ap.add_argument('--mock',action='store_true'); ap.add_argument('--real-models',action='store_true'); ap.add_argument('--dry-run',action='store_true')
     args=ap.parse_args(); paths=[Path(p) for p in (args.mode_configs or default_mode_paths())]
     modes=[load_mode(p) for p in paths]
     if args.dry_run:
@@ -54,7 +54,7 @@ def main():
     if str(args.output_dir).endswith('.jsonl') and len(modes) == 1:
         out_file = Path(args.output_dir)
         out_file.parent.mkdir(parents=True, exist_ok=True)
-        strategy=build_strategy(modes[0],adapter)
+        strategy=build_strategy(modes[0],adapter,use_real_models=args.real_models)
         rows=[]
         for inst in instances:
             r=run_game(inst['start_page'],inst['target_page'],strategy,adapter,budget=modes[0].budget)
@@ -86,7 +86,7 @@ def main():
     (out/'instances.jsonl').write_text('\n'.join(json.dumps(i) for i in instances)+'\n')
     summary={}
     for m in modes:
-        strategy=build_strategy(m,adapter)
+        strategy=build_strategy(m,adapter,use_real_models=args.real_models)
         mdir=out/m.strategy; mdir.mkdir(exist_ok=True)
         rows=[]
         for inst in instances:

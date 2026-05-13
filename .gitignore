@@ -4,7 +4,14 @@ logs/
 *.checkpoint.json
 *.tmp
 __pycache__/
+*.egg-info/
 .pytest_cache/
+.tmp/
+tmp_pytest/
+test_tmp*/
+pip_tmp/
+streamlit_verify.*
+pytest-cache-files-*/
 data/oracle/*.sqlite
 data/oracle/*.sqlite3
 data/oracle/*.db

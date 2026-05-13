@@ -1,0 +1,16 @@
+services:
+  wikirace:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      DEMO_MODE: ${DEMO_MODE:-true}
+      ALLOW_LIVE_RUNS: ${ALLOW_LIVE_RUNS:-false}
+      BENCHMARK_MODE: ${BENCHMARK_MODE:-demo}
+      DEFAULT_CONFIG_PATH: ${DEFAULT_CONFIG_PATH:-evals/config.yaml}
+      REPORTS_DIR: ${REPORTS_DIR:-reports}
+      WIKIRACE_API_BASE_URL: ${WIKIRACE_API_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      WIKIRACE_MOCK: ${WIKIRACE_MOCK:-0}
+    volumes:
+      - ./reports:/app/reports

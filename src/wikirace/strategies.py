@@ -1,10 +1,14 @@
+import ast
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from .api_client import FrontierAPIClient
 from .config import ModeConfig
 from .fallback import select_fallback
 from .replan import evaluate_replan
 from .oracle import DistanceOracle
+from .strategic_model import StrategicModel
+from .tactical_model import TacticalModel
 
 
 class NavigationStrategy(Protocol):
@@ -110,8 +114,23 @@ class _BaselineModel:
     def chat(self, messages):
         text = messages[-1]["content"]
         links = text.split("Outgoing links: ")[1].split("\n")[0]
-        arr = eval(links) if links.startswith("[") else []
+        arr = ast.literal_eval(links) if links.startswith("[") else []
         return arr[0] if arr else ""
+
+
+class _OpenAIBaselineModel:
+    def __init__(self, api: FrontierAPIClient, model: str):
+        self.api = api
+        self.model = model
+
+    def chat(self, messages):
+        result = self.api.complete_json(
+            self.model,
+            "Choose exactly one page title from the provided outgoing links. Return only the page title.",
+            {"messages": messages},
+            temperature=0,
+        )
+        return str(result.text).strip().strip('"')
 
 
 class _Ranker:
@@ -124,14 +143,23 @@ class _Planner:
         return {"backbone": ["X"]}
 
 
-def build_strategy(config: ModeConfig, adapter) -> NavigationStrategy:
+def build_strategy(config: ModeConfig, adapter, use_real_models: bool = False) -> NavigationStrategy:
+    api = FrontierAPIClient() if use_real_models else None
+    if use_real_models and not api.available():
+        raise RuntimeError("OPENAI_API_KEY is required when --real-models is set")
     if config.strategy == "baseline":
-        return BaselineStrategy(model=_BaselineModel())
+        model = _OpenAIBaselineModel(api, config.model) if api else _BaselineModel()
+        return BaselineStrategy(model=model)
     if config.strategy == "state_only":
-        return StatefulStrategy(model=_Ranker(), adapter=adapter, top_k=config.top_k, deterministic_fallback=config.deterministic_fallback)
+        model = TacticalModel(api, config.model, top_k=config.top_k) if api else _Ranker()
+        return StatefulStrategy(model=model, adapter=adapter, top_k=config.top_k, deterministic_fallback=config.deterministic_fallback)
     if config.strategy == "stratified":
-        return StratifiedStrategy(model=_Ranker(), adapter=adapter, top_k=config.top_k, deterministic_fallback=config.deterministic_fallback, strategic_model=_Planner(), replan_interval=config.replan_interval, decay_replan=config.decay_replan)
+        model = TacticalModel(api, config.tactical_model, top_k=config.top_k) if api else _Ranker()
+        planner = StrategicModel(api, config.strategic_model) if api else _Planner()
+        return StratifiedStrategy(model=model, adapter=adapter, top_k=config.top_k, deterministic_fallback=config.deterministic_fallback, strategic_model=planner, replan_interval=config.replan_interval, decay_replan=config.decay_replan)
     if config.strategy == "full":
         oracle = DistanceOracle(config.oracle_db_path) if config.oracle_db_path else None
-        return FullStrategy(model=_Ranker(), adapter=adapter, top_k=config.top_k, deterministic_fallback=config.deterministic_fallback, strategic_model=_Planner(), replan_interval=config.replan_interval, decay_replan=config.decay_replan, escape_threshold=config.escape_threshold or 10, oracle=oracle)
+        model = TacticalModel(api, config.tactical_model, top_k=config.top_k) if api else _Ranker()
+        planner = StrategicModel(api, config.strategic_model) if api else _Planner()
+        return FullStrategy(model=model, adapter=adapter, top_k=config.top_k, deterministic_fallback=config.deterministic_fallback, strategic_model=planner, replan_interval=config.replan_interval, decay_replan=config.decay_replan, escape_threshold=config.escape_threshold or 10, oracle=oracle)
     raise ValueError(config.strategy)

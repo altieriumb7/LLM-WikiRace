@@ -1,0 +1,81 @@
+{
+  "summary": {
+    "mode": "demo",
+    "total_cases": 6,
+    "pass_count": 5,
+    "fail_count": 0,
+    "warning_count": 1,
+    "pass_rate": 0.8333,
+    "categories_covered": [
+      "budget control",
+      "configuration safety",
+      "deployment safety",
+      "external API handling",
+      "failure recovery",
+      "loop control"
+    ],
+    "is_demo": true
+  },
+  "cases": [
+    {
+      "case_id": "cycle-avoidance",
+      "category": "loop control",
+      "input_prompt": "Current page A has links back to A and forward to D while target is T.",
+      "expected_behavior": "Prefer an unvisited forward candidate and avoid repeating pages.",
+      "observed_demo_output": "The deterministic controller skips visited pages when non-visited candidates exist.",
+      "qualitative_assessment": "Shows the value of explicit visited-state tracking for WikiRace navigation.",
+      "status": "pass",
+      "notes": "Grounded in StatefulStrategy loop checks and fallback tests."
+    },
+    {
+      "case_id": "budget-awareness",
+      "category": "budget control",
+      "input_prompt": "A candidate appears promising but its estimated distance exceeds remaining steps.",
+      "expected_behavior": "Reject candidates that cannot fit within the step budget.",
+      "observed_demo_output": "Budget checks prevent selecting candidates where steps_used + 1 + estimated_dist exceeds budget.",
+      "qualitative_assessment": "Demonstrates transparent constraint handling instead of purely greedy link choice.",
+      "status": "pass",
+      "notes": "Grounded in budget pruning tests."
+    },
+    {
+      "case_id": "deterministic-fallback",
+      "category": "failure recovery",
+      "input_prompt": "The ranker returns only rejected candidates but an unvisited outgoing link remains.",
+      "expected_behavior": "Use deterministic fallback rather than crashing or silently stopping.",
+      "observed_demo_output": "Fallback selects an unvisited page and records fallback usage.",
+      "qualitative_assessment": "Improves demo robustness and produces auditable counters.",
+      "status": "pass",
+      "notes": "Grounded in fallback module and runner counters."
+    },
+    {
+      "case_id": "api-error-continuation",
+      "category": "external API handling",
+      "input_prompt": "The live WikiRace API raises an HTTP or malformed response error.",
+      "expected_behavior": "Return a failed result with an API error counter instead of masking the failure.",
+      "observed_demo_output": "The game loop catches adapter errors and returns failure_reason=api_error.",
+      "qualitative_assessment": "Good for batch evaluation because failures become reportable data.",
+      "status": "warning",
+      "notes": "Live API behavior still requires manual verification with a real endpoint."
+    },
+    {
+      "case_id": "config-validation",
+      "category": "configuration safety",
+      "input_prompt": "A baseline mode config enables full-strategy-only settings.",
+      "expected_behavior": "Reject invalid config before a run starts.",
+      "observed_demo_output": "ModeConfig raises ConfigValidationError for invalid combinations.",
+      "qualitative_assessment": "Protects reproducibility by failing early on incompatible modes.",
+      "status": "pass",
+      "notes": "Grounded in config validation tests."
+    },
+    {
+      "case_id": "public-demo-safety",
+      "category": "deployment safety",
+      "input_prompt": "A public visitor opens the Hugging Face Space without credentials.",
+      "expected_behavior": "Show static demo artifacts and disable live model/API spending.",
+      "observed_demo_output": "Dashboard defaults to DEMO_MODE=true and ALLOW_LIVE_RUNS=false.",
+      "qualitative_assessment": "Suitable for portfolio hosting without exposing or spending API quota.",
+      "status": "pass",
+      "notes": "Implemented in app settings and dashboard guardrails."
+    }
+  ]
+}

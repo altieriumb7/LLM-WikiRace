@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional
-import json
+import yaml
 
 class ConfigValidationError(ValueError): ...
 
@@ -38,18 +38,15 @@ class ModeConfig:
 
 
 def _parse_yaml(path: Path) -> dict:
-    data={}
-    for ln in path.read_text().splitlines():
-        s=ln.strip()
-        if not s or s.startswith('#') or ':' not in s: continue
-        k,v=s.split(':',1); v=v.strip()
-        if v in ('null','None'): val=None
-        elif v in ('true','false'): val=(v=='true')
-        elif v.isdigit(): val=int(v)
-        elif v.startswith('['): val=json.loads(v.replace("'",'"'))
-        else: val=v.strip('"')
-        data[k.strip()]=val
+    data=yaml.safe_load(path.read_text()) or {}
+    if not isinstance(data, dict):
+        raise ConfigValidationError(f'{path} must contain a YAML mapping')
+    if "strategy" not in data:
+        raise ConfigValidationError(f'{path} must contain a flat mode config with strategy')
     return data
 
 def load_mode(path: Path) -> ModeConfig:
-    return ModeConfig(**_parse_yaml(path))
+    try:
+        return ModeConfig(**_parse_yaml(path))
+    except TypeError as exc:
+        raise ConfigValidationError(f'invalid mode config {path}: {exc}') from exc
