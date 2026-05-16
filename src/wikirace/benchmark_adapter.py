@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
@@ -16,9 +16,9 @@ class BenchmarkStateView:
 class BenchmarkStateAdapter:
     """Normalize official benchmark GameState variants to a stable internal view."""
 
-    OUTGOING_KEYS = ("outgoing_links", "links", "choices")
+    OUTGOING_KEYS = ("outgoing_links", "links", "choices", "available_choices")
     VISITED_KEYS = ("visited_pages", "visited", "path", "history")
-    STEPS_KEYS = ("steps_used", "step", "num_steps")
+    STEPS_KEYS = ("steps_used", "step", "num_steps", "step_number")
     TARGET_KEYS = ("target_page", "target", "goal")
     CURRENT_KEYS = ("current_page", "current", "page")
 

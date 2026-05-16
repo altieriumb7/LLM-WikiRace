@@ -18,3 +18,9 @@ data/oracle/*.db
 data/oracle.db
 *.sqlite
 *.sqlite3
+.venv
+.env.example
+.env
+.env.local
+.env.*
+!.env.example
