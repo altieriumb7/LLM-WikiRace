@@ -38,6 +38,7 @@ def compute_summary(cases: list[BenchmarkCase]) -> dict[str, Any]:
     pass_count = sum(1 for c in cases if c.status == "pass")
     fail_count = sum(1 for c in cases if c.status == "fail")
     warning_count = sum(1 for c in cases if c.status == "warning")
+    non_fail_count = pass_count + warning_count
     categories = sorted({c.category for c in cases})
     return {
         "mode": "demo",
@@ -45,10 +46,34 @@ def compute_summary(cases: list[BenchmarkCase]) -> dict[str, Any]:
         "pass_count": pass_count,
         "fail_count": fail_count,
         "warning_count": warning_count,
+        "non_fail_count": non_fail_count,
         "pass_rate": round(pass_count / total, 4) if total else 0.0,
+        "non_fail_rate": round(non_fail_count / total, 4) if total else 0.0,
         "categories_covered": categories,
         "is_demo": True,
     }
+
+
+def compute_category_summary(cases: list[BenchmarkCase]) -> list[dict[str, Any]]:
+    rows = []
+    for category in sorted({case.category for case in cases}):
+        subset = [case for case in cases if case.category == category]
+        total = len(subset)
+        pass_count = sum(1 for case in subset if case.status == "pass")
+        warning_count = sum(1 for case in subset if case.status == "warning")
+        fail_count = sum(1 for case in subset if case.status == "fail")
+        rows.append(
+            {
+                "category": category,
+                "total_cases": total,
+                "pass_count": pass_count,
+                "warning_count": warning_count,
+                "fail_count": fail_count,
+                "pass_rate": round(pass_count / total, 4) if total else 0.0,
+                "non_fail_rate": round((pass_count + warning_count) / total, 4) if total else 0.0,
+            }
+        )
+    return rows
 
 
 def cases_to_rows(cases: list[BenchmarkCase]) -> list[dict[str, str]]:
@@ -66,6 +91,7 @@ def render_gallery_markdown(cases: list[BenchmarkCase], summary: dict[str, Any])
         f"- Warning: {summary['warning_count']}",
         f"- Fail: {summary['fail_count']}",
         f"- Pass rate: {summary['pass_rate']:.0%}",
+        f"- Non-failing rate: {summary['non_fail_rate']:.0%}",
         "",
     ]
     for case in cases:

@@ -5,7 +5,9 @@
     "pass_count": 5,
     "fail_count": 0,
     "warning_count": 1,
+    "non_fail_count": 6,
     "pass_rate": 0.8333,
+    "non_fail_rate": 1.0,
     "categories_covered": [
       "budget control",
       "configuration safety",

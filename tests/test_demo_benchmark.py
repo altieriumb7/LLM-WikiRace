@@ -1,6 +1,6 @@
 import json
 
-from wikirace.demo_benchmark import compute_summary, load_cases, write_demo_benchmark
+from wikirace.demo_benchmark import compute_category_summary, compute_summary, load_cases, write_demo_benchmark
 
 
 CASES = "benchmarks/qualitative_wikirace_cases.yaml"
@@ -18,6 +18,13 @@ def test_summary_metrics():
     assert summary["pass_count"] == 5
     assert summary["warning_count"] == 1
     assert summary["pass_rate"] == 0.8333
+    assert summary["non_fail_rate"] == 1.0
+
+
+def test_category_summary_metrics():
+    rows = compute_category_summary(load_cases(CASES))
+    assert {row["category"] for row in rows}
+    assert all("pass_rate" in row and "non_fail_rate" in row for row in rows)
 
 
 def test_demo_benchmark_generation_is_deterministic(tmp_path):

@@ -7,6 +7,7 @@ These are deterministic sample results for the public demo. They do not claim li
 - Warning: 1
 - Fail: 0
 - Pass rate: 83%
+- Non-failing rate: 100%
 
 ## cycle-avoidance: loop control
 

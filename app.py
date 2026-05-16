@@ -14,7 +14,13 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from wikirace.config import ConfigValidationError, load_mode
-from wikirace.demo_benchmark import compute_summary, load_cases, load_demo_report, write_demo_benchmark
+from wikirace.demo_benchmark import (
+    compute_category_summary,
+    compute_summary,
+    load_cases,
+    load_demo_report,
+    write_demo_benchmark,
+)
 
 
 DEFAULT_CASES = ROOT / "benchmarks" / "qualitative_wikirace_cases.yaml"
@@ -93,19 +99,28 @@ def render_benchmark_tab(settings: dict[str, object], report_dir: Path) -> None:
     rows = report.get("cases", [])
     df = pd.DataFrame(rows)
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Total", summary["total_cases"])
-    c2.metric("Pass", summary["pass_count"])
-    c3.metric("Warning", summary["warning_count"])
-    c4.metric("Pass rate", f"{summary['pass_rate']:.0%}")
+    c2.metric("Successful", summary["pass_count"])
+    c3.metric("Warnings", summary["warning_count"])
+    c4.metric("Success rate", f"{summary['pass_rate']:.0%}")
+    c5.metric("Non-failing rate", f"{summary.get('non_fail_rate', summary['pass_rate']):.0%}")
+
+    st.progress(float(summary["pass_rate"]))
+    st.caption(
+        "Success rate counts only pass cases. Non-failing rate counts pass + warning cases, "
+        "so reviewers can separate confirmed success from cases that need manual follow-up."
+    )
 
     st.subheader("Category Breakdown")
     if not df.empty:
-        st.dataframe(df.groupby(["category", "status"]).size().reset_index(name="count"), use_container_width=True)
+        status_counts = df["status"].value_counts().rename_axis("status").reset_index(name="count")
+        st.bar_chart(status_counts, x="status", y="count")
+        st.dataframe(pd.DataFrame(compute_category_summary(cases)), use_container_width=True)
 
     st.subheader("Qualitative Case Gallery")
     for row in rows:
-        label = f"{row['case_id']} · {row['category']} · {row['status']}"
+        label = f"{row['case_id']} | {row['category']} | {row['status']}"
         with st.expander(label):
             st.write("Input prompt")
             st.code(row["input_prompt"])
